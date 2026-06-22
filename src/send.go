@@ -7,14 +7,15 @@ import (
 	"os"
 )
 
-func newListener(meta Metadata) *net.Conn {
-	sock, err:= net.Listen("tcp4", meta.Host + ":" + meta.Port)
+func newListener(metadata Metadata) *net.Conn {
+	target := metadata.Host + ":" + metadata.Port
+	sock, err:= net.Listen("tcp4", target)
 	if err != nil {
-		panic("Could not set up TCP socket listening to port " + meta.Port)
+		panic("Could not set up TCP socket listening to " + target)
 	}
 	conn, err := sock.Accept()
 	if err != nil {
-		panic("Error stabilishing connection")
+		panic("Error stabilishing connection with " + target)
 	}
 	return &conn
 }
@@ -26,9 +27,12 @@ func Send(metadata Metadata) {
 	}
 
 	sock := *newListener(metadata)
+	defer file.Close()
 	defer sock.Close()
 
 	buffer := make([]byte, 1024)
+
+	fmt.Println("Starting file transfer")
 
 	for {
 		n, err := file.Read(buffer)
