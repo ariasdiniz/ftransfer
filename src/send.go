@@ -47,6 +47,8 @@ func Send(metadata Metadata) {
 		if n == 0 || err != nil {
 			panic("Error transfering bytes")
 		}
+		
+		clear(buffer)
 	}
 
 	fmt.Println("File sent successfully!")
