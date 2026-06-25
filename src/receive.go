@@ -32,7 +32,7 @@ func Receive(metadata Metadata) {
 	defer (*conn).Close()
 
 	reader := io.Reader(*conn)
-	buffer := make([]byte, packageSize)
+	buffer := make([]byte, packetSize)
 
 	fmt.Println("Starting file transfer")
 

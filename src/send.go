@@ -35,7 +35,7 @@ func Send(metadata Metadata) {
 
 	sock := newListener(metadata)
 	conn := *acceptConn(metadata, sock)
-	buffer := make([]byte, packageSize)
+	buffer := make([]byte, packetSize)
 
 	defer (*sock).Close()
 
@@ -55,7 +55,7 @@ func Send(metadata Metadata) {
 		if n == 0 || err != nil {
 			conn.Close()
 			conn = *acceptConn(metadata, sock)
-			_, err = file.Seek(-packageSize, 1)
+			_, err = file.Seek(-packetSize, 1)
 			if err != nil {
 				conn.Close()
 				panic("Error moving file offset")

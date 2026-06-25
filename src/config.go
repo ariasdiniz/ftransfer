@@ -1,5 +1,5 @@
 package src
 
 const (
-	packageSize = 1024
+	packetSize = 1024
 )
