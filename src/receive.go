@@ -21,21 +21,26 @@ func Receive(metadata Metadata) {
 	if err != nil {
 		panic("Error creating file " + metadata.Fname)
 	}
+	defer file.Close()
+
 	offset, err := file.Seek(0, 0)
 	if err != nil || offset != 0 {
 		panic("Error opening the file " + metadata.Fname)
 	}
 
 	conn := newConnector(metadata)
+	defer (*conn).Close()
+
 	reader := io.Reader(*conn)
-	buffer := make([]byte, 1024)
+	buffer := make([]byte, packetSize)
 
 	fmt.Println("Starting file transfer")
 
 	for {
 		n, err := io.ReadFull(reader, buffer)
 		if err != nil && err != io.EOF {
-			panic("Error receiving bytes")
+			conn = newConnector(metadata)
+			continue
 		}
 
 		_, err = file.Write(buffer)

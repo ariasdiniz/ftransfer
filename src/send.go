@@ -7,13 +7,19 @@ import (
 	"os"
 )
 
-func newListener(metadata Metadata) *net.Conn {
+func newListener(metadata Metadata) *net.Listener {
 	target := metadata.Host + ":" + metadata.Port
-	sock, err:= net.Listen("tcp4", target)
+	sock, err := net.Listen("tcp4", target)
+	fmt.Println("Ready to transfer file, awaiting connection")
 	if err != nil {
 		panic("Could not set up TCP socket listening to " + target)
 	}
-	conn, err := sock.Accept()
+	return &sock
+}
+
+func acceptConn(metadata Metadata, sock *net.Listener) *net.Conn {
+	conn, err := (*sock).Accept()
+	target := metadata.Host + ":" + metadata.Port
 	if err != nil {
 		panic("Error stabilishing connection with " + target)
 	}
@@ -21,16 +27,17 @@ func newListener(metadata Metadata) *net.Conn {
 }
 
 func Send(metadata Metadata) {
-  file, err := os.Open(metadata.Fname)
+	file, err := os.Open(metadata.Fname)
 	if err != nil {
 		panic("Could not open file " + metadata.Fname)
 	}
-
-	sock := *newListener(metadata)
 	defer file.Close()
-	defer sock.Close()
 
-	buffer := make([]byte, 1024)
+	sock := newListener(metadata)
+	conn := *acceptConn(metadata, sock)
+	buffer := make([]byte, packetSize)
+
+	defer (*sock).Close()
 
 	fmt.Println("Starting file transfer")
 
@@ -43,13 +50,22 @@ func Send(metadata Metadata) {
 		if n == 0 || err == io.EOF {
 			break
 		}
-		n, err = sock.Write(buffer)
+
+		n, err = conn.Write(buffer)
 		if n == 0 || err != nil {
-			panic("Error transfering bytes")
+			conn.Close()
+			conn = *acceptConn(metadata, sock)
+			_, err = file.Seek(-packetSize, 1)
+			if err != nil {
+				conn.Close()
+				panic("Error moving file offset")
+			}
+			continue
 		}
-		
+
 		clear(buffer)
 	}
 
+	conn.Close()
 	fmt.Println("File sent successfully!")
 }
