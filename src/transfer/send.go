@@ -1,29 +1,36 @@
-package src
+package transfer
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"os"
 )
 
-func newListener(metadata Metadata) *net.Listener {
+func newListener(metadata Metadata) net.Listener {
 	target := metadata.Host + ":" + metadata.Port
 	sock, err := net.Listen("tcp4", target)
 	fmt.Println("Ready to transfer file, awaiting connection")
 	if err != nil {
 		panic("Could not set up TCP socket listening to " + target)
 	}
-	return &sock
+	return sock
 }
 
-func acceptConn(metadata Metadata, sock *net.Listener) *net.Conn {
-	conn, err := (*sock).Accept()
+func acceptConn(metadata Metadata, sock net.Listener) net.Conn {
+	conn, err := sock.Accept()
 	target := metadata.Host + ":" + metadata.Port
 	if err != nil {
 		panic("Error stabilishing connection with " + target)
 	}
-	return &conn
+	return conn
+}
+
+func writeInt(conn net.Conn, i int) {
+	buffer := make([]byte, 2)
+	binary.LittleEndian.PutUint16(buffer, uint16(i))
+	conn.Write(buffer)
 }
 
 func Send(metadata Metadata) {
@@ -34,12 +41,15 @@ func Send(metadata Metadata) {
 	defer file.Close()
 
 	sock := newListener(metadata)
-	conn := *acceptConn(metadata, sock)
+	conn := acceptConn(metadata, sock)
 	buffer := make([]byte, packetSize)
 
-	defer (*sock).Close()
+	defer sock.Close()
 
 	fmt.Println("Starting file transfer")
+
+	writeInt(conn, len(metadata.Fname))
+	conn.Write([]byte(metadata.Fname))
 
 	for {
 		n, err := file.Read(buffer)
@@ -51,10 +61,10 @@ func Send(metadata Metadata) {
 			break
 		}
 
-		n, err = conn.Write(buffer)
+		n, err = conn.Write(buffer[:n])
 		if n == 0 || err != nil {
 			conn.Close()
-			conn = *acceptConn(metadata, sock)
+			conn = acceptConn(metadata, sock)
 			_, err = file.Seek(-packetSize, 1)
 			if err != nil {
 				conn.Close()
