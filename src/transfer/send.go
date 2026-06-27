@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 )
@@ -27,10 +28,17 @@ func acceptConn(metadata Metadata, sock net.Listener) net.Conn {
 	return conn
 }
 
-func writeInt(conn net.Conn, i int) {
-	buffer := make([]byte, 2)
-	binary.LittleEndian.PutUint16(buffer, uint16(i))
+func writeMetadata(conn net.Conn, fMetadata FileMetadataHeader) {
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, fMetadata.FnameSize)
 	conn.Write(buffer)
+
+	conn.Write([]byte(fMetadata.Fname))
+
+	clear(buffer)
+	binary.LittleEndian.PutUint64(buffer, fMetadata.Fsize)
+	conn.Write(buffer)
+
 }
 
 func Send(metadata Metadata) {
@@ -40,6 +48,8 @@ func Send(metadata Metadata) {
 	}
 	defer file.Close()
 
+	stat, _ := os.Stat(metadata.Fname)
+
 	sock := newListener(metadata)
 	conn := acceptConn(metadata, sock)
 	buffer := make([]byte, packetSize)
@@ -47,30 +57,61 @@ func Send(metadata Metadata) {
 	defer sock.Close()
 
 	fmt.Println("Starting file transfer")
+	fMetadata := FileMetadataHeader{
+		FnameSize: uint64(len(metadata.Fname)),
+		Fname:     metadata.Fname,
+		Fsize:     uint64(stat.Size()),
+	}
 
-	writeInt(conn, len(metadata.Fname))
-	conn.Write([]byte(metadata.Fname))
+	totalPackets := uint64(math.Floor(float64(fMetadata.Fsize / packetSize)))
+
+	writeMetadata(conn, fMetadata)
+	fmt.Println("------------------------------------")
+	fmt.Printf("Transfering file: %s\n", fMetadata.Fname)
+	fmt.Printf("File size: %d bytes\n", fMetadata.Fsize)
+
+	bPacketNumber := make([]byte, 8)
 
 	for {
+	Retry:
+		_, err := io.ReadFull(conn, bPacketNumber)
+		if err != nil {
+			fmt.Println("Connection lost. Trying to reconnect")
+			conn.Close()
+			conn = acceptConn(metadata, sock)
+			fmt.Println("Reconnected")
+			goto Retry
+		}
+
+		packetNumber := binary.LittleEndian.Uint64(bPacketNumber)
+		_, err = file.Seek(int64(packetSize*packetNumber), 0)
+		if err != nil {
+			conn.Close()
+			panic("Error moving file offset")
+		}
+
 		n, err := file.Read(buffer)
 		if err != nil && err != io.EOF {
+			conn.Close()
 			panic("Error reading file from disk.")
 		}
 
-		if n == 0 || err == io.EOF {
-			break
-		}
-
-		n, err = conn.Write(buffer[:n])
+		n, err = conn.Write(buffer)
 		if n == 0 || err != nil {
+			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()
 			conn = acceptConn(metadata, sock)
+			fmt.Println("Reconnected")
 			_, err = file.Seek(-packetSize, 1)
 			if err != nil {
 				conn.Close()
 				panic("Error moving file offset")
 			}
 			continue
+		}
+
+		if packetNumber == totalPackets {
+			break
 		}
 
 		clear(buffer)

@@ -34,6 +34,10 @@ func ShowMenu(metadata transfer.Metadata) transfer.Metadata {
 
 	fmt.Println("What is the IP of the file sender? Write in this format: 0.0.0.0")
 	scanner.Scan()
-	metadata.Host = scanner.Text()
+	host := scanner.Text()
+
+	if host != "" {
+		metadata.Host = host
+	}
 	return metadata
 }
