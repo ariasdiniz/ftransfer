@@ -74,7 +74,7 @@ func Receive(metadata Metadata) {
 
 	fmt.Println("------------------------------------")
 	fmt.Printf("Receiving file: %s\n", fMetadata.Fname)
-	fmt.Printf("File size: %d bytes\n", fMetadata.Fsize)
+	fmt.Printf("File size: %d bytes.\n", fMetadata.Fsize)
 
 	file, err := os.Create(fMetadata.Fname)
 	if err != nil {
@@ -91,6 +91,13 @@ func Receive(metadata Metadata) {
 
 	fmt.Printf("Starting file transfer, receiving %s\n", fMetadata.Fname)
 	totalPackets := int(math.Ceil(float64(fMetadata.Fsize) / packetSize))
+
+	fmt.Printf(
+		"Transfered %d of %d packets. Each packet have %d bytes.\n",
+		0,
+		totalPackets,
+		packetSize,
+	)
 
 	for packetNumber := range totalPackets {
 		n, err := receivePacket(&buffer, conn, packetNumber)
@@ -109,6 +116,13 @@ func Receive(metadata Metadata) {
 		}
 
 		clear(buffer)
+
+		fmt.Printf(
+			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d bytes.\n",
+			packetNumber+1,
+			totalPackets,
+			packetSize,
+		)
 
 		if n != 1024 {
 			break

@@ -72,6 +72,13 @@ func Send(metadata Metadata) {
 
 	bPacketNumber := make([]byte, 8)
 
+	fmt.Printf(
+		"Transfered %d of %d packets. Each packet have %d bytes.\n",
+		0,
+		totalPackets+1,
+		packetSize,
+	)
+
 	for {
 	Retry:
 		_, err := io.ReadFull(conn, bPacketNumber)
@@ -109,6 +116,13 @@ func Send(metadata Metadata) {
 			}
 			continue
 		}
+
+		fmt.Printf(
+			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d bytes.\n",
+			packetNumber+1,
+			totalPackets+1,
+			packetSize,
+		)
 
 		if packetNumber == totalPackets {
 			break
