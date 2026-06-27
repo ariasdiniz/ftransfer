@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/ariasdiniz/ftransfer/src"
+
+	"github.com/ariasdiniz/ftransfer/src/menu"
+	"github.com/ariasdiniz/ftransfer/src/transfer"
 )
 
 func main() {
@@ -13,22 +15,22 @@ func main() {
 
 	flag.Parse()
 
-	if *fname == "" || *host == "" {
-		panic("You must set conn, fname and host!")
-	}
-
-	meta := src.Metadata{
+	meta := transfer.Metadata{
 		Conn:  *conn,
 		Fname: *fname,
 		Host:  *host,
 		Port:  *port,
 	}
 
-	switch *conn {
+	if *fname == "" || *host == "" {
+		meta = menu.ShowMenu(meta)
+	}
+
+	switch meta.Conn {
 	case "receiver":
-		src.Receive(meta)
+		transfer.Receive(meta)
 	case "sender":
-		src.Send(meta)
+		transfer.Send(meta)
 	default:
 		panic("Invalid conn argument. Use receiver or sender")
 	}
