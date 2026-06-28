@@ -1,34 +1,40 @@
 package transfer
 
 import (
+	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"os"
 	"path/filepath"
 )
 
-func newConnector(metadata Metadata) net.Conn {
+func newConnector(metadata Metadata) *tls.Conn {
 	target := metadata.Host + ":" + metadata.Port
-	conn, err := net.Dial("tcp4", target)
+	config := tls.Config{
+		InsecureSkipVerify: true,
+	}
+	conn, err := tls.Dial("tcp4", target, &config)
 	if err != nil {
 		panic("Error stabilishing connection with sender at " + target)
 	}
 	return conn
 }
 
-func readNameSize(conn net.Conn) uint64 {
+func readNameSize(conn *tls.Conn) uint64 {
 	var fnameSize uint64
 	buffer := make([]byte, 8)
 	io.ReadFull(conn, buffer)
 	fnameSize = binary.LittleEndian.Uint64(buffer)
+	if fnameSize > packetSize {
+		return packetSize
+	}
 	return fnameSize
 }
 
-func receivePacket(buffer *[]byte, conn net.Conn, packetNumber int) (int, error) {
+func receivePacket(buffer *[]byte, conn *tls.Conn, packetNumber int) (int, error) {
 	bPacketNumber := make([]byte, 8)
 	binary.LittleEndian.PutUint64(bPacketNumber, uint64(packetNumber))
 
@@ -39,13 +45,13 @@ func receivePacket(buffer *[]byte, conn net.Conn, packetNumber int) (int, error)
 
 	n, err = io.ReadFull(conn, *buffer)
 	if err != nil {
-		return 0, errors.New("Error reading packet")
+		return 0, err
 	}
 
 	return n, nil
 }
 
-func readFileMetadata(conn net.Conn, metadata Metadata) FileMetadataHeader {
+func readFileMetadata(conn *tls.Conn, metadata Metadata) FileMetadataHeader {
 	fMetadata := FileMetadataHeader{
 		FnameSize: 0,
 		Fname:     "",
@@ -101,7 +107,7 @@ func Receive(metadata Metadata) {
 
 	for packetNumber := range totalPackets {
 		n, err := receivePacket(&buffer, conn, packetNumber)
-		if err != nil && err != io.EOF {
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()
 			conn = newConnector(metadata)
@@ -128,7 +134,6 @@ func Receive(metadata Metadata) {
 			break
 		}
 	}
-
 	conn.Close()
 	fmt.Println("File received successfully and stored at " + fMetadata.Fname)
 }

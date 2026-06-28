@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,7 +12,15 @@ import (
 
 func newListener(metadata Metadata) net.Listener {
 	target := metadata.Host + ":" + metadata.Port
-	sock, err := net.Listen("tcp4", target)
+	fmt.Println("Creating RSA certificate for data encryption")
+	cert, err := CreateInMemoryCert()
+	if err != nil {
+		fmt.Println("Error during certificate creation. Cannot ensure connection security")
+	}
+	config := tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+	sock, err := tls.Listen("tcp4", target, &config)
 	fmt.Println("Ready to transfer file, awaiting connection")
 	if err != nil {
 		panic("Could not set up TCP socket listening to " + target)
@@ -80,14 +89,13 @@ func Send(metadata Metadata) {
 	)
 
 	for {
-	Retry:
 		_, err := io.ReadFull(conn, bPacketNumber)
 		if err != nil {
 			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()
 			conn = acceptConn(metadata, sock)
 			fmt.Println("Reconnected")
-			goto Retry
+			continue
 		}
 
 		packetNumber := binary.LittleEndian.Uint64(bPacketNumber)
@@ -103,7 +111,7 @@ func Send(metadata Metadata) {
 			panic("Error reading file from disk.")
 		}
 
-		n, err = conn.Write(buffer)
+		n, err = conn.Write(buffer[:n])
 		if n == 0 || err != nil {
 			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()
