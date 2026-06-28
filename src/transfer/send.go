@@ -80,14 +80,13 @@ func Send(metadata Metadata) {
 	)
 
 	for {
-	Retry:
 		_, err := io.ReadFull(conn, bPacketNumber)
 		if err != nil {
 			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()
 			conn = acceptConn(metadata, sock)
 			fmt.Println("Reconnected")
-			goto Retry
+			continue
 		}
 
 		packetNumber := binary.LittleEndian.Uint64(bPacketNumber)
@@ -103,7 +102,7 @@ func Send(metadata Metadata) {
 			panic("Error reading file from disk.")
 		}
 
-		n, err = conn.Write(buffer)
+		n, err = conn.Write(buffer[:n])
 		if n == 0 || err != nil {
 			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()

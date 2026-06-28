@@ -25,6 +25,9 @@ func readNameSize(conn net.Conn) uint64 {
 	buffer := make([]byte, 8)
 	io.ReadFull(conn, buffer)
 	fnameSize = binary.LittleEndian.Uint64(buffer)
+	if fnameSize > packetSize {
+		return packetSize
+	}
 	return fnameSize
 }
 
@@ -39,7 +42,7 @@ func receivePacket(buffer *[]byte, conn net.Conn, packetNumber int) (int, error)
 
 	n, err = io.ReadFull(conn, *buffer)
 	if err != nil {
-		return 0, errors.New("Error reading packet")
+		return 0, err
 	}
 
 	return n, nil
@@ -101,7 +104,7 @@ func Receive(metadata Metadata) {
 
 	for packetNumber := range totalPackets {
 		n, err := receivePacket(&buffer, conn, packetNumber)
-		if err != nil && err != io.EOF {
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			fmt.Println("Connection lost. Trying to reconnect")
 			conn.Close()
 			conn = newConnector(metadata)
@@ -128,7 +131,6 @@ func Receive(metadata Metadata) {
 			break
 		}
 	}
-
 	conn.Close()
 	fmt.Println("File received successfully and stored at " + fMetadata.Fname)
 }
