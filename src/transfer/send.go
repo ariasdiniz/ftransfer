@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,7 +12,15 @@ import (
 
 func newListener(metadata Metadata) net.Listener {
 	target := metadata.Host + ":" + metadata.Port
-	sock, err := net.Listen("tcp4", target)
+	fmt.Println("Creating RSA certificate for data encryption")
+	cert, err := CreateInMemoryCert()
+	if err != nil {
+		fmt.Println("Error during certificate creation. Cannot ensure connection security")
+	}
+	config := tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+	sock, err := tls.Listen("tcp4", target, &config)
 	fmt.Println("Ready to transfer file, awaiting connection")
 	if err != nil {
 		panic("Could not set up TCP socket listening to " + target)
