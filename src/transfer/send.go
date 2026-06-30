@@ -85,7 +85,7 @@ func Send(metadata Metadata) {
 		"Transfered %d of %d packets. Each packet have %d Kb.\n",
 		0,
 		totalPackets+1,
-		packetSize / 1000,
+		packetSize/1024,
 	)
 
 	for {
@@ -126,10 +126,10 @@ func Send(metadata Metadata) {
 		}
 
 		fmt.Printf(
-			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d bytes.\n",
+			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d Kb.\n",
 			packetNumber+1,
 			totalPackets+1,
-			packetSize,
+			packetSize/1024,
 		)
 
 		if packetNumber == totalPackets {
