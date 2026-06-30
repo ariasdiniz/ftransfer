@@ -1,5 +1,5 @@
 package transfer
 
 const (
-	packetSize = 1024
+	packetSize = 102400
 )

@@ -99,10 +99,10 @@ func Receive(metadata Metadata) {
 	totalPackets := int(math.Ceil(float64(fMetadata.Fsize) / packetSize))
 
 	fmt.Printf(
-		"Transfered %d of %d packets. Each packet have %d bytes.\n",
+		"Transfered %d of %d packets. Each packet have %d Kb.\n",
 		0,
 		totalPackets,
-		packetSize,
+		packetSize/1000,
 	)
 
 	for packetNumber := range totalPackets {
@@ -130,7 +130,7 @@ func Receive(metadata Metadata) {
 			packetSize,
 		)
 
-		if n != 1024 {
+		if n != packetSize {
 			break
 		}
 	}
