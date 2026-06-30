@@ -82,10 +82,10 @@ func Send(metadata Metadata) {
 	bPacketNumber := make([]byte, 8)
 
 	fmt.Printf(
-		"Transfered %d of %d packets. Each packet have %d bytes.\n",
+		"Transfered %d of %d packets. Each packet have %d Kb.\n",
 		0,
 		totalPackets+1,
-		packetSize,
+		packetSize / 1000,
 	)
 
 	for {
