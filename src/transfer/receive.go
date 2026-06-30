@@ -102,7 +102,7 @@ func Receive(metadata Metadata) {
 		"Transfered %d of %d packets. Each packet have %d Kb.\n",
 		0,
 		totalPackets,
-		packetSize/1000,
+		packetSize/1024,
 	)
 
 	for packetNumber := range totalPackets {
@@ -124,10 +124,10 @@ func Receive(metadata Metadata) {
 		clear(buffer)
 
 		fmt.Printf(
-			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d bytes.\n",
+			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d Kb.\n",
 			packetNumber+1,
 			totalPackets,
-			packetSize,
+			packetSize/1024,
 		)
 
 		if n != packetSize {
