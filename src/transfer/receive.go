@@ -23,13 +23,25 @@ func newConnector(metadata Metadata) *tls.Conn {
 	return conn
 }
 
-func readNameSize(conn *tls.Conn) uint64 {
+func packetSizeDefReceiver(conn *tls.Conn, metadata Metadata) uint64 {
+	pBuffer := make([]byte, 8)
+	pSize := uint64(metadata.Psize)
+	binary.LittleEndian.PutUint64(pBuffer, pSize)
+	conn.Write(pBuffer)
+	io.ReadFull(conn, pBuffer)
+	pSize = binary.LittleEndian.Uint64(pBuffer)
+	pSize = min(pSize, maxPacketSize)
+	pSize = max(pSize, minPacketSize)
+	return pSize
+}
+
+func readNameSize(conn *tls.Conn, pSize uint64) uint64 {
 	var fnameSize uint64
 	buffer := make([]byte, 8)
 	io.ReadFull(conn, buffer)
 	fnameSize = binary.LittleEndian.Uint64(buffer)
-	if fnameSize > packetSize {
-		return packetSize
+	if fnameSize > pSize {
+		return pSize
 	}
 	return fnameSize
 }
@@ -44,21 +56,21 @@ func receivePacket(buffer *[]byte, conn *tls.Conn, packetNumber int) (int, error
 	}
 
 	n, err = io.ReadFull(conn, *buffer)
-	if err != nil {
+	if err != nil && err != io.ErrUnexpectedEOF {
 		return 0, err
 	}
 
 	return n, nil
 }
 
-func readFileMetadata(conn *tls.Conn, metadata Metadata) FileMetadataHeader {
+func readFileMetadata(conn *tls.Conn, metadata Metadata, pSize uint64) FileMetadataHeader {
 	fMetadata := FileMetadataHeader{
 		FnameSize: 0,
 		Fname:     "",
 		Fsize:     0,
 	}
 	if metadata.Fname == "" {
-		fnameSize := readNameSize(conn)
+		fnameSize := readNameSize(conn, pSize)
 		fname := make([]byte, fnameSize)
 		io.ReadFull(conn, fname)
 		fMetadata.Fname = filepath.Base(string(fname))
@@ -74,9 +86,10 @@ func readFileMetadata(conn *tls.Conn, metadata Metadata) FileMetadataHeader {
 
 func Receive(metadata Metadata) {
 	conn := newConnector(metadata)
-	buffer := make([]byte, packetSize)
+	pSize := packetSizeDefReceiver(conn, metadata)
+	buffer := make([]byte, pSize)
 
-	fMetadata := readFileMetadata(conn, metadata)
+	fMetadata := readFileMetadata(conn, metadata, pSize)
 
 	fmt.Println("------------------------------------")
 	fmt.Printf("Receiving file: %s\n", fMetadata.Fname)
@@ -96,13 +109,13 @@ func Receive(metadata Metadata) {
 	}
 
 	fmt.Printf("Starting file transfer, receiving %s\n", fMetadata.Fname)
-	totalPackets := int(math.Ceil(float64(fMetadata.Fsize) / packetSize))
+	totalPackets := int(math.Ceil(float64(fMetadata.Fsize) / float64(pSize)))
 
 	fmt.Printf(
 		"Transfered %d of %d packets. Each packet have %d Kb.\n",
 		0,
 		totalPackets,
-		packetSize/1024,
+		pSize/1024,
 	)
 
 	for packetNumber := range totalPackets {
@@ -115,7 +128,7 @@ func Receive(metadata Metadata) {
 			continue
 		}
 
-		_, err = file.Write(buffer)
+		_, err = file.Write(buffer[:n])
 		if err != nil {
 			conn.Close()
 			panic("Error writing to file")
@@ -127,10 +140,10 @@ func Receive(metadata Metadata) {
 			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d Kb.\n",
 			packetNumber+1,
 			totalPackets,
-			packetSize/1024,
+			pSize/1024,
 		)
 
-		if n != packetSize {
+		if n != int(pSize) {
 			break
 		}
 	}
