@@ -28,6 +28,17 @@ func newListener(metadata Metadata) net.Listener {
 	return sock
 }
 
+func packetSizeDefSender(conn net.Conn) uint64 {
+	pBuffer := make([]byte, 8)
+	io.ReadFull(conn, pBuffer)
+	pSize := binary.LittleEndian.Uint64(pBuffer)
+	pSize = min(pSize, maxPacketSize)
+	pSize = max(pSize, minPacketSize)
+	binary.LittleEndian.PutUint64(pBuffer, pSize)
+	conn.Write(pBuffer)
+	return pSize
+}
+
 func acceptConn(metadata Metadata, sock net.Listener) net.Conn {
 	conn, err := sock.Accept()
 	target := metadata.Host + ":" + metadata.Port
@@ -61,7 +72,8 @@ func Send(metadata Metadata) {
 
 	sock := newListener(metadata)
 	conn := acceptConn(metadata, sock)
-	buffer := make([]byte, packetSize)
+	pSize := packetSizeDefSender(conn)
+	buffer := make([]byte, pSize)
 
 	defer sock.Close()
 
@@ -72,7 +84,7 @@ func Send(metadata Metadata) {
 		Fsize:     uint64(stat.Size()),
 	}
 
-	totalPackets := uint64(math.Floor(float64(fMetadata.Fsize / packetSize)))
+	totalPackets := uint64(math.Floor(float64(fMetadata.Fsize / pSize)))
 
 	writeMetadata(conn, fMetadata)
 	fmt.Println("------------------------------------")
@@ -85,7 +97,7 @@ func Send(metadata Metadata) {
 		"Transfered %d of %d packets. Each packet have %d Kb.\n",
 		0,
 		totalPackets+1,
-		packetSize/1024,
+		pSize/1024,
 	)
 
 	for {
@@ -99,7 +111,7 @@ func Send(metadata Metadata) {
 		}
 
 		packetNumber := binary.LittleEndian.Uint64(bPacketNumber)
-		_, err = file.Seek(int64(packetSize*packetNumber), 0)
+		_, err = file.Seek(int64(pSize*packetNumber), 0)
 		if err != nil {
 			conn.Close()
 			panic("Error moving file offset")
@@ -117,7 +129,7 @@ func Send(metadata Metadata) {
 			conn.Close()
 			conn = acceptConn(metadata, sock)
 			fmt.Println("Reconnected")
-			_, err = file.Seek(-packetSize, 1)
+			_, err = file.Seek(-int64(pSize), 1)
 			if err != nil {
 				conn.Close()
 				panic("Error moving file offset")
@@ -129,7 +141,7 @@ func Send(metadata Metadata) {
 			"\033[1A\033[2KTransfered %d of %d packets. Each packet have %d Kb.\n",
 			packetNumber+1,
 			totalPackets+1,
-			packetSize/1024,
+			pSize/1024,
 		)
 
 		if packetNumber == totalPackets {

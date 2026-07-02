@@ -6,6 +6,7 @@ type Metadata struct {
 	Host  string
 	Port  string
 	Size  int
+	Psize int
 }
 
 type FileMetadataHeader struct {
